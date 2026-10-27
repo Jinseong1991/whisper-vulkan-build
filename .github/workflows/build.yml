@@ -1,0 +1,112 @@
+name: build-whisper-vulkan
+
+# 공식 ggml-org/whisper.cpp 소스를 고정 태그·고정 커밋으로 받아 Windows Vulkan 판 whisper-server 를 만든다.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "만들 릴리스 태그"
+        default: "whisper-v1.9.5-vulkan-1"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  WHISPER_TAG: v1.9.5
+  # v1.9.5 태그가 가리키는 커밋 (아래에서 체크아웃 결과와 대조)
+  WHISPER_COMMIT: d1be6fde11ac6e0407606b4e42fe72d34add8037
+  VULKAN_SDK_VERSION: 1.4.357.0
+  VULKAN_SDK_SHA256: 81f474711e9042f4cd22b31b2f7a8870db2e428b21586fb43dd80150be97310d
+  CMAKE_FLAGS: >-
+    -DGGML_VULKAN=ON -DWHISPER_BUILD_SERVER=ON -DBUILD_SHARED_LIBS=ON -DGGML_NATIVE=OFF
+    -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DWHISPER_SDL2=OFF
+  ZIP_NAME: whisper-v1.9.5-win-vulkan-x64.zip
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: whisper.cpp 체크아웃 (공식, 고정 태그)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: v1.9.5
+          path: whisper.cpp
+
+      - name: 소스 커밋 확인
+        shell: bash
+        run: |
+          actual=$(git -C whisper.cpp rev-parse HEAD)
+          echo "source commit: $actual"
+          test "$actual" = "$WHISPER_COMMIT"
+
+      - name: Vulkan SDK 설치 (LunarG 공식, SHA-256 확인)
+        shell: pwsh
+        run: |
+          $url = "https://sdk.lunarg.com/sdk/download/$env:VULKAN_SDK_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_SDK_VERSION.exe"
+          Invoke-WebRequest -Uri $url -OutFile vulkansdk.exe
+          $h = (Get-FileHash vulkansdk.exe -Algorithm SHA256).Hash.ToLower()
+          if ($h -ne $env:VULKAN_SDK_SHA256) { throw "Vulkan SDK SHA-256 불일치: $h" }
+          .\vulkansdk.exe --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.core com.lunarg.vulkan.vma
+          $sdk = "C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+          if (-not (Test-Path "$sdk\Bin\glslc.exe")) { throw "glslc.exe 없음" }
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: 설정과 빌드 (Release)
+        shell: bash
+        working-directory: whisper.cpp
+        run: |
+          cmake -B build $CMAKE_FLAGS
+          cmake --build build --config Release -j 4
+
+      - name: 묶기와 확인
+        shell: pwsh
+        run: |
+          $bin = "whisper.cpp\build\bin\Release"
+          Get-ChildItem $bin | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          $dlls = Get-ChildItem $bin -Filter *.dll
+          $cpu = @($dlls | Where-Object Name -like "ggml-cpu-*.dll")
+          if (-not (Test-Path "$bin\whisper-server.exe")) { throw "whisper-server.exe 없음" }
+          if (-not (Test-Path "$bin\ggml-vulkan.dll")) { throw "ggml-vulkan.dll 없음" }
+          if ($cpu.Count -lt 4) { throw "ggml-cpu-*.dll 변형이 $($cpu.Count)개뿐" }
+          $stage = "stage"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item "$bin\whisper-server.exe", "$bin\*.dll" $stage
+          Copy-Item whisper.cpp\LICENSE "$stage\LICENSE-whisper.cpp.txt"
+          Compress-Archive -Path "$stage\*" -DestinationPath $env:ZIP_NAME
+          $sha = (Get-FileHash $env:ZIP_NAME -Algorithm SHA256).Hash.ToLower()
+          "$sha *$env:ZIP_NAME" | Out-File -FilePath "$env:ZIP_NAME.sha256" -Encoding ascii
+          "ZIP_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "zip sha256: $sha"
+
+      - name: 결과 올리기 (확인용)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: whisper-vulkan
+          path: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+
+      - name: 릴리스 만들기
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          cat > notes.md <<NOTES
+          공식 [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) \`$WHISPER_TAG\` 를 그대로 빌드한 Windows Vulkan 판 whisper-server (비공식 빌드, 소스 수정 없음).
+
+          - 소스: https://github.com/ggml-org/whisper.cpp/tree/$WHISPER_TAG
+          - 소스 커밋: \`$WHISPER_COMMIT\`
+          - 러너: windows-2022, Vulkan SDK $VULKAN_SDK_VERSION (SHA-256 \`$VULKAN_SDK_SHA256\`)
+          - 빌드 플래그: \`$CMAKE_FLAGS\` (Release)
+          - $ZIP_NAME SHA-256: \`$ZIP_SHA256\`
+          - 라이선스: MIT (zip 안 LICENSE-whisper.cpp.txt)
+          - 빌드 실행: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          NOTES
+          gh release create "$RELEASE_TAG" "$ZIP_NAME" "$ZIP_NAME.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" --notes-file notes.md
