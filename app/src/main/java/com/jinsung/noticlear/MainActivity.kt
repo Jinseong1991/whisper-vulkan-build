@@ -24,6 +24,8 @@ class MainActivity : Activity() {
     private lateinit var swOverlay: Switch
     private lateinit var preview: View
     private var syncing = false
+    private var checkedUpdate = false
+    private var updating = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,10 +71,47 @@ class MainActivity : Activity() {
             })
         }
         updatePreview()
+        findViewById<TextView>(R.id.ver_text).text =
+            "버전 v1." + Updater.currentCode(this)
+    }
+
+    private fun checkUpdate() {
+        if (checkedUpdate) return
+        checkedUpdate = true
+        Thread {
+            val rel = runCatching { Updater.fetchLatest() }.getOrNull() ?: return@Thread
+            if (rel.code <= Updater.currentCode(this)) return@Thread
+            runOnUiThread {
+                findViewById<View>(R.id.update_card).visibility = View.VISIBLE
+                findViewById<TextView>(R.id.update_text).text = "새 버전 v1.${rel.code} 이 있어요"
+                val btn = findViewById<TextView>(R.id.btn_update)
+                btn.setOnClickListener { startUpdate(rel.url, btn) }
+            }
+        }.start()
+    }
+
+    private fun startUpdate(url: String, btn: TextView) {
+        if (updating) return
+        if (!packageManager.canRequestPackageInstalls()) {
+            android.widget.Toast.makeText(this, "'이 출처 허용'을 켠 뒤 다시 눌러주세요", android.widget.Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+        updating = true
+        btn.text = "받는 중 0%"
+        Thread {
+            try {
+                Updater.downloadAndInstall(this, url) { p -> runOnUiThread { btn.text = "받는 중 $p%" } }
+                runOnUiThread { btn.text = "설치 화면 여는 중…" }
+            } catch (e: Exception) {
+                runOnUiThread { btn.text = "다시 시도"; android.widget.Toast.makeText(this, "다운로드 실패: ${e.message}", android.widget.Toast.LENGTH_LONG).show() }
+            } finally { updating = false }
+        }.start()
     }
 
     override fun onResume() {
         super.onResume()
+        checkUpdate()
         setStatus(R.id.status_access, hasAccess(this))
         setStatus(R.id.status_overlay, Settings.canDrawOverlays(this))
         syncing = true; swOverlay.isChecked = OverlayService.running; syncing = false

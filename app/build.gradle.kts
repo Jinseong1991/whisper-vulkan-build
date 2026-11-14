@@ -9,8 +9,8 @@ android {
         applicationId = "com.jinsung.noticlear"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = (project.findProperty("vc") as String?)?.toInt() ?: 2
+        versionName = "1." + ((project.findProperty("vc") as String?) ?: "2")
     }
     signingConfigs {
         create("fixed") {
