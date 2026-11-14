@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:label="알림지우개"
-        android:icon="@drawable/ic_clear"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:icon="@drawable/ic_launcher"
+        android:theme="@style/AppTheme">
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
@@ -12,7 +16,6 @@
             </intent-filter>
         </activity>
 
-        <!-- 다른 앱 알림을 지우는 권한(알림 접근) -->
         <service
             android:name=".ClearListenerService"
             android:exported="true"
@@ -23,7 +26,14 @@
             </intent-filter>
         </service>
 
-        <!-- 홈화면 위젯 -->
+        <service
+            android:name=".OverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating notification clear button" />
+        </service>
+
         <receiver android:name=".ClearWidget" android:exported="true" android:label="알림 지우기">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

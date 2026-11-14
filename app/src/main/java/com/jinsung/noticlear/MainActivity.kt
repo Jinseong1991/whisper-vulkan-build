@@ -4,9 +4,12 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Button
+import android.view.View
+import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
 
 class MainActivity : Activity() {
@@ -18,21 +21,83 @@ class MainActivity : Activity() {
         }
     }
 
+    private lateinit var swOverlay: Switch
+    private lateinit var preview: View
+    private var syncing = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        findViewById<Button>(R.id.btn_access).setOnClickListener {
+
+        findViewById<View>(R.id.btn_clear).setOnClickListener {
+            it.animate().rotationBy(360f).setDuration(400).start()
+            Clearer.clear(this)
+        }
+        findViewById<View>(R.id.row_access).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        findViewById<Button>(R.id.btn_test).setOnClickListener {
-            sendBroadcast(Intent(this, ClearWidget::class.java).setAction(ClearWidget.ACTION_CLEAR))
+        findViewById<View>(R.id.row_overlay).setOnClickListener { openOverlaySettings() }
+
+        swOverlay = findViewById(R.id.sw_overlay)
+        swOverlay.setOnCheckedChangeListener { _, on ->
+            if (syncing) return@setOnCheckedChangeListener
+            if (on) {
+                if (!Settings.canDrawOverlays(this)) {
+                    syncing = true; swOverlay.isChecked = false; syncing = false
+                    openOverlaySettings(); return@setOnCheckedChangeListener
+                }
+                startForegroundService(Intent(this, OverlayService::class.java))
+            } else stopService(Intent(this, OverlayService::class.java))
         }
+
+        preview = findViewById(R.id.preview_bubble)
+        val alphaVal = findViewById<TextView>(R.id.alpha_val)
+        val sizeVal = findViewById<TextView>(R.id.size_val)
+
+        findViewById<SeekBar>(R.id.seek_alpha).apply {
+            max = 80; progress = Prefs.alpha(this@MainActivity) - 20
+            alphaVal.text = "${progress + 20}%"
+            setOnSeekBarChangeListener(simple { p ->
+                val v = p + 20; alphaVal.text = "$v%"; Prefs.setAlpha(this@MainActivity, v); updatePreview()
+            })
+        }
+        findViewById<SeekBar>(R.id.seek_size).apply {
+            max = 40; progress = Prefs.size(this@MainActivity) - 40
+            sizeVal.text = "${progress + 40}dp"
+            setOnSeekBarChangeListener(simple { p ->
+                val v = p + 40; sizeVal.text = "${v}dp"; Prefs.setSize(this@MainActivity, v); updatePreview()
+            })
+        }
+        updatePreview()
     }
 
     override fun onResume() {
         super.onResume()
-        findViewById<TextView>(R.id.status).text =
-            if (hasAccess(this)) "✅ 알림 접근 허용됨\n홈화면에 '알림 지우기' 위젯을 추가하세요"
-            else "❌ 알림 접근이 꺼져 있어요\n아래 버튼 → 알림지우개 켜기"
+        setStatus(R.id.status_access, hasAccess(this))
+        setStatus(R.id.status_overlay, Settings.canDrawOverlays(this))
+        syncing = true; swOverlay.isChecked = OverlayService.running; syncing = false
+    }
+
+    private fun setStatus(id: Int, ok: Boolean) {
+        findViewById<TextView>(id).apply {
+            text = if (ok) "허용됨" else "설정하기 ›"
+            setBackgroundResource(if (ok) R.drawable.chip_ok else R.drawable.chip_warn)
+        }
+    }
+
+    private fun openOverlaySettings() = startActivity(
+        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+
+    private fun updatePreview() {
+        val d = resources.displayMetrics.density
+        val s = (Prefs.size(this) * d).toInt()
+        preview.layoutParams = preview.layoutParams.apply { width = s; height = s }
+        preview.alpha = Prefs.alpha(this) / 100f
+    }
+
+    private fun simple(f: (Int) -> Unit) = object : SeekBar.OnSeekBarChangeListener {
+        override fun onProgressChanged(sb: SeekBar, p: Int, fromUser: Boolean) { if (fromUser) f(p) }
+        override fun onStartTrackingTouch(sb: SeekBar) {}
+        override fun onStopTrackingTouch(sb: SeekBar) {}
     }
 }
