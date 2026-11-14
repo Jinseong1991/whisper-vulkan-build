@@ -60,6 +60,22 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- 고정 알림 숨기기 -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="@drawable/card_bg" android:padding="18dp"
+        android:layout_marginTop="14dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:text="📌  고정 알림도 숨기기" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold"/>
+            <Switch android:id="@+id/sw_persistent" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:thumbTint="#FFFFFF" android:trackTint="#9F8CFF"/>
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:textColor="#A9A3D9" android:textSize="13sp" android:lineSpacingExtra="2dp"
+            android:text="모아라인 실행중 같은 지워지지 않는 알림을 12시간 숨겨요.\n앱은 계속 정상 작동하고, 새 콜 알림은 그대로 떠요."/>
+    </LinearLayout>
+
     <!-- 플로팅 버튼 카드 -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:background="@drawable/card_bg" android:padding="18dp"

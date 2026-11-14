@@ -52,6 +52,11 @@ class MainActivity : Activity() {
             } else stopService(Intent(this, OverlayService::class.java))
         }
 
+        findViewById<Switch>(R.id.sw_persistent).apply {
+            isChecked = Prefs.hidePersistent(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setHidePersistent(this@MainActivity, on) }
+        }
+
         preview = findViewById(R.id.preview_bubble)
         val alphaVal = findViewById<TextView>(R.id.alpha_val)
         val sizeVal = findViewById<TextView>(R.id.size_val)
