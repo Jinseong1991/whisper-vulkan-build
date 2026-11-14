@@ -10,6 +10,9 @@ object Prefs {
     fun setSize(c: Context, v: Int) = sp(c).edit().putInt("size", v).apply()
     fun hidePersistent(c: Context) = sp(c).getBoolean("hide_persistent", true)
     fun setHidePersistent(c: Context, v: Boolean) = sp(c).edit().putBoolean("hide_persistent", v).apply()
+    fun snoozed(c: Context): Set<String> = sp(c).getStringSet("snoozed", emptySet())!!.toSet()
+    fun addSnoozed(c: Context, k: Set<String>) = sp(c).edit().putStringSet("snoozed", snoozed(c) + k).apply()
+    fun clearSnoozed(c: Context) = sp(c).edit().remove("snoozed").apply()
     fun pos(c: Context) = Pair(sp(c).getInt("x", -1), sp(c).getInt("y", 400))
     fun setPos(c: Context, x: Int, y: Int) = sp(c).edit().putInt("x", x).putInt("y", y).apply()
     fun register(c: Context, l: android.content.SharedPreferences.OnSharedPreferenceChangeListener) =

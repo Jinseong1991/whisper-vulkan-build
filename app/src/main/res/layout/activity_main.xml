@@ -73,7 +73,11 @@
         </LinearLayout>
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="4dp" android:textColor="#A9A3D9" android:textSize="13sp" android:lineSpacingExtra="2dp"
-            android:text="모아라인 실행중 같은 지워지지 않는 알림을 12시간 숨겨요.\n앱은 계속 정상 작동하고, 새 콜 알림은 그대로 떠요."/>
+            android:text="모아라인 실행중, '앱 위에 표시 중' 같은 지워지지 않는 알림을 12시간 숨겨요.\n앱은 계속 정상 작동하고, 새 콜 알림은 그대로 떠요."/>
+        <TextView android:id="@+id/btn_restore" android:layout_width="match_parent" android:layout_height="48dp"
+            android:layout_marginTop="12dp" android:gravity="center" android:clickable="true"
+            android:background="@drawable/btn_outline" android:text="↩  숨긴 고정 알림 되돌리기"
+            android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold"/>
     </LinearLayout>
 
     <!-- 플로팅 버튼 카드 -->

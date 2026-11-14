@@ -57,6 +57,8 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on -> Prefs.setHidePersistent(this@MainActivity, on) }
         }
 
+        findViewById<View>(R.id.btn_restore).setOnClickListener { Clearer.restore(this) }
+
         preview = findViewById(R.id.preview_bubble)
         val alphaVal = findViewById<TextView>(R.id.alpha_val)
         val sizeVal = findViewById<TextView>(R.id.size_val)
